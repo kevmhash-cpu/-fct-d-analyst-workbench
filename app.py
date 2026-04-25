@@ -14,9 +14,9 @@ from typing import List, Dict, Tuple
 
 import pandas as pd
 import streamlit as st
-
+from core_engine_v2 import analyze_document as analyze_document_v2
 try:
-    from docx import Document
+from docx import Document
 except Exception:
     Document = None
 
@@ -251,7 +251,7 @@ with main_tab:
         if not text_input.strip():
             st.error("Please paste or upload text before running analysis.")
         else:
-            st.session_state["last_result"] = analyze_document(text_input)
+            st.session_state["last_result"] = analyze_document_v2(text_input)
             st.session_state["last_text"] = text_input
     if "last_result" in st.session_state:
         result = st.session_state["last_result"]
