@@ -5,12 +5,6 @@ from collections import Counter
 # DOCTRINE CONSTANTS
 # ---------------------------
 
-# Node ladder per FCT-D Doctrine Section 5:
-# A = "It is"   — verified, independently sourceable
-# E = "It happened" — observable occurrence, no interpretation
-# C = "It means"    — interpretation, assigns significance
-# I = "It must be"  — stacked conclusion beyond direct evidence
-
 ANCHOR_SIGNALS = [
     r"\b(confirmed|verified|established|documented|recorded|certified)\b",
     r"\baccording to [A-Z][a-z]+ (report|study|filing|data|statistics)\b",
@@ -86,21 +80,15 @@ TRIAGE_MATRIX = {
     ("Emotional",    "Hierarchical"): "Grief escalates into doctrine. Map emotional cascade path before engaging.",
     ("Emotional",    "Lattice"):      "Most manipulative variant. Multiple trauma anchors mutually reinforce. Per-anchor verification required.",
     ("Institutional","Hub-Spoke"):    "Classic disinfo playbook. Named agency as hub; check primary docs first.",
-    ("Institutional","Hierarchical"): "Agency → program → claim tree. Refute at institutional tier first; subclaims may persist.",
+    ("Institutional","Hierarchical"): "Agency -> program -> claim tree. Refute at institutional tier first; subclaims may persist.",
     ("Institutional","Lattice"):      "Agencies cross-cited. Each lends the others halo. Verify each institution independently.",
     ("Technical",    "Hub-Spoke"):    "Jargon hub radiating pseudoscience. SME review of anchor term usually sufficient.",
-    ("Technical",    "Hierarchical"): "Real paper → misread finding → theory tree. Engage at paper level.",
+    ("Technical",    "Hierarchical"): "Real paper -> misread finding -> theory tree. Engage at paper level.",
     ("Technical",    "Lattice"):      "Most durable variant. Escalate to SME triage.",
 }
 
 # ---------------------------
 # NODE CLASSIFICATION
-# Doctrine field tests:
-#   A — "Can I prove this from a primary source outside this artifact?"
-#   E — "Is this describing what occurred, not interpreting it?"
-#   C — "Is this explaining meaning instead of stating fact?"
-#   I — "Does this depend on prior claims rather than direct verification?"
-# Primary failure point: Event → Claim transition (doctrine Section 5)
 # ---------------------------
 
 def _score(statement, patterns):
@@ -113,20 +101,15 @@ def classify_statement(s):
         "C": _score(s, CLAIM_SIGNALS),
         "I": _score(s, INFERENCE_SIGNALS),
     }
-    # Doctrine primary failure point: boost Claim when co-occurring with Event
     if scores["E"] > 0 and scores["C"] > 0:
         scores["C"] += 0.5
-    # Inference stacks on claims
     if scores["C"] > 0 and scores["I"] > 0:
         scores["I"] += 0.5
-
     best = max(scores, key=scores.get)
-    return best if scores[best] > 0 else "E"  # default to Event, not Anchor
-
+    return best if scores[best] > 0 else "E"
 
 # ---------------------------
-# TEXT SPLITTING (three-scale)
-# Micro = sentences, Meso = paragraphs, Macro = first+last
+# TEXT SPLITTING
 # ---------------------------
 
 def split_statements(text):
@@ -142,7 +125,6 @@ def split_paragraphs(text):
     return [p for p in paras if len(p) > 25]
 
 def assign_scales(text):
-    """Returns list of (scale, text) tuples for micro/meso/macro analysis."""
     sentences  = split_statements(text)
     paragraphs = split_paragraphs(text)
     units = []
@@ -159,7 +141,6 @@ def assign_scales(text):
         units.append(("Macro", sentences[0]))
     return units
 
-
 # ---------------------------
 # CHAIN BUILDER
 # ---------------------------
@@ -167,10 +148,8 @@ def assign_scales(text):
 def build_chain(statements):
     return [{"text": s, "type": classify_statement(s)} for s in statements]
 
-
 # ---------------------------
 # EDGE SCORING
-# Reflects doctrine risk hierarchy: A→E safe, E→C risky, C→I highest risk
 # ---------------------------
 
 def edge_score(n1, n2):
@@ -191,7 +170,6 @@ def build_transitions(chain):
         scores.append(score)
     return transitions, scores
 
-
 # ---------------------------
 # ANCHOR SCORE
 # ---------------------------
@@ -199,16 +177,14 @@ def build_transitions(chain):
 def anchor_score(chain):
     return 0.95 if any(n["type"] == "A" for n in chain) else 0.70
 
-
 # ---------------------------
-# DROP-OFF (doctrine: anchor score − avg edge score)
+# DROP-OFF
 # ---------------------------
 
 def calculate_dropoff(anchor, edge_scores):
     if not edge_scores:
         return 0.0
     return round(anchor - (sum(edge_scores) / len(edge_scores)), 3)
-
 
 # ---------------------------
 # ESCALATION DETECTION
@@ -217,9 +193,8 @@ def calculate_dropoff(anchor, edge_scores):
 def detect_escalation(transitions):
     return [t for t in transitions if t["transition"] in ("E->I", "C->I", "A->I")]
 
-
 # ---------------------------
-# KEY STATEMENTS (3–5)
+# KEY STATEMENTS
 # ---------------------------
 
 def key_statements(chain):
@@ -230,13 +205,8 @@ def key_statements(chain):
                 selected.append(node)
     return selected[:5]
 
-
 # ---------------------------
 # TOPOLOGY DETECTION
-# Doctrine Axis 2:
-#   Hub-Spoke    — single anchor, N peripheral claims
-#   Hierarchical — 2 anchors (root + sub-anchor tier) + claims below
-#   Lattice      — 3+ anchors cross-reinforcing
 # ---------------------------
 
 def detect_topology(chain):
@@ -244,7 +214,6 @@ def detect_topology(chain):
     anchors = counts.get("A", 0)
     claims  = counts.get("C", 0)
     infer   = counts.get("I", 0)
-
     if anchors >= 3 and claims >= 2:
         return "Lattice"
     if anchors <= 1 and (claims + infer) >= 3:
@@ -253,12 +222,8 @@ def detect_topology(chain):
         return "Hierarchical"
     return "Hub-Spoke" if claims >= anchors else "Hierarchical"
 
-
 # ---------------------------
 # ANCHOR TYPE DETECTION
-# Doctrine Axis 1: Emotional / Institutional / Technical
-# Institutional terms weighted heavily — generic words like "data"
-# should not override clear organizational language.
 # ---------------------------
 
 def detect_anchor_type(chain):
@@ -270,7 +235,6 @@ def detect_anchor_type(chain):
     }
     best = max(scores, key=scores.get)
     return best if scores[best] > 0 else "Institutional"
-
 
 # ---------------------------
 # SOURCE COUNTING
@@ -285,7 +249,6 @@ def count_sources(text):
     ]
     return sum(len(re.findall(p, text, re.I)) for p in patterns)
 
-
 # ---------------------------
 # FCT METRICS
 # ---------------------------
@@ -295,21 +258,16 @@ def calculate_metrics(chain, text):
     total        = max(len(chain), 1)
     source_count = count_sources(text)
     interpretive = counts.get("C", 0) + counts.get("I", 0)
-
     unsupported  = max(0, interpretive - source_count)
     total_edges  = max(1, counts.get("E", 0) + interpretive)
     uer          = min(1.0, unsupported / total_edges)
-
     anchor_ratio      = counts.get("A", 0) / total
     interpretive_ratio = interpretive / total
     drop_off          = min(1.0, max(0.0, interpretive_ratio - anchor_ratio + 0.25))
-
     connectivity = min(1.0, counts.get("C", 0) * 0.07 + counts.get("I", 0) * 0.10)
     anchors      = max(counts.get("A", 0), 1)
     centrality   = min(1.0, interpretive / (anchors * 8))
-
     score = (0.40 * uer) + (0.25 * drop_off) + (0.20 * connectivity) + (0.15 * centrality)
-
     return {
         "UER":            round(uer, 2),
         "Drop-off":       round(drop_off, 2),
@@ -319,13 +277,11 @@ def calculate_metrics(chain, text):
         "Source Count":   source_count,
     }
 
-
 # ---------------------------
-# CONDITION ASSESSMENT (doctrine-faithful)
+# CONDITION ASSESSMENT
 # ---------------------------
 
 def check_anchor_presence(chain):
-    """Doctrine 4.1: verifiable, semi-verifiable, or emotionally salient entry point."""
     anchor_count = sum(1 for n in chain if n["type"] == "A")
     if anchor_count >= 1:
         return True, f"Anchor node detected ({anchor_count} statement(s))."
@@ -335,7 +291,6 @@ def check_anchor_presence(chain):
     return False, "No verifiable or salient anchor detected."
 
 def check_structural_transfer(chain, metrics):
-    """Doctrine 4.2: credibility spreads through design rather than explicit evidence."""
     counts       = Counter(n["type"] for n in chain)
     interpretive = counts.get("C", 0) + counts.get("I", 0)
     anchors      = counts.get("A", 0)
@@ -350,8 +305,9 @@ def check_structural_transfer(chain, metrics):
 
 def check_fractal_recursion_scaled(scale_units):
     """
-    Doctrine 4.3 (LOAD-BEARING): pattern must repeat at micro, meso, AND macro
-    scales simultaneously. Checks each scale independently.
+    Doctrine 4.3 (LOAD-BEARING): the credibility transfer pattern repeats
+    at micro, meso, AND macro scales simultaneously.
+    A scale passes if it contains at least one interpretive node (C or I).
     """
     by_scale = {"Micro": Counter(), "Meso": Counter(), "Macro": Counter()}
     for scale, text in scale_units:
@@ -361,12 +317,11 @@ def check_fractal_recursion_scaled(scale_units):
     results = {}
     for scale, counts in by_scale.items():
         has_interpretive = (counts.get("C", 0) + counts.get("I", 0)) >= 1
-        has_sourcing     = (counts.get("A", 0) + counts.get("E", 0)) >= 1
-        results[scale]   = has_interpretive and has_sourcing
+        results[scale] = has_interpretive
 
-    detail = " | ".join(f"{s}: {'✓' if v else '✗'}" for s, v in results.items())
+    detail = " | ".join(f"{s}: {'checkmark' if v else 'X'}" for s, v in results.items())
     if all(results.values()):
-        return True, f"Credibility transfer confirmed at all three scales. [{detail}]"
+        return True, f"Credibility transfer pattern confirmed at all three scales. [{detail}]"
     failing = [s for s, v in results.items() if not v]
     if len(failing) == 1:
         return False, (
@@ -376,16 +331,11 @@ def check_fractal_recursion_scaled(scale_units):
     return False, f"Fractal Recursion not confirmed. [{detail}]"
 
 def check_density_sourcing(metrics):
-    """Doctrine Criterion 4: high claim volume vs. low external sourcing."""
     if metrics["UER"] >= 0.50:
         return True, f"High unsupported edge ratio ({metrics['UER']}): many interpretive nodes, few external sources."
     return False, f"Density imbalance not strongly confirmed (UER={metrics['UER']})."
 
 def check_self_referential_closure(text, metrics):
-    """
-    Doctrine Criterion 5: claims loop internally without external validation.
-    Internal cross-references serve as apparent corroboration.
-    """
     self_val = [
         r"\b(validates?|confirms?|establishes?|certif(ies|y)) (the|its|their) (own|authority|mandate|process|methodology|role|conclusion|finding)\b",
         r"\bno (external|independent|outside) (review|source|validation|verification|audit) (is |was )?(required|needed|necessary)\b",
@@ -398,21 +348,18 @@ def check_self_referential_closure(text, metrics):
     s = text.lower()
     sv = sum(1 for p in self_val if re.search(p, s, re.I))
     cr = sum(1 for p in circular if re.search(p, s, re.I))
-
     if sv >= 1 or cr >= 1:
         return True, f"Self-referential closure confirmed (self-validation={sv}, circular={cr})."
     if metrics["Source Count"] <= 1 and metrics["UER"] >= 0.50:
         return True, f"Closure indicated: low external sourcing ({metrics['Source Count']}) with high interpretive load."
     return False, "No strong self-referential closure detected."
 
-
 # ---------------------------
-# TRIAGE MATRIX LOOKUP
+# TRIAGE MATRIX
 # ---------------------------
 
 def triage_matrix(anchor_type, topology):
     return TRIAGE_MATRIX.get((anchor_type, topology), "General analysis required — verify anchor independently.")
-
 
 # ---------------------------
 # MAIN ANALYSIS FUNCTION
@@ -422,7 +369,6 @@ def analyze_document(text):
     statements  = split_statements(text)
     chain       = build_chain(statements)
     scale_units = assign_scales(text)
-
     transitions, edge_scores = build_transitions(chain)
     anchor      = anchor_score(chain)
     dropoff     = calculate_dropoff(anchor, edge_scores)
@@ -432,36 +378,31 @@ def analyze_document(text):
     anchor_type = detect_anchor_type(chain)
     guidance    = triage_matrix(anchor_type, topology)
     metrics     = calculate_metrics(chain, text)
-
-    # Condition assessment
-    cond_anchor   = check_anchor_presence(chain)
-    cond_transfer = check_structural_transfer(chain, metrics)
+    cond_anchor    = check_anchor_presence(chain)
+    cond_transfer  = check_structural_transfer(chain, metrics)
     cond_recursion = check_fractal_recursion_scaled(scale_units)
-    cond_density  = check_density_sourcing(metrics)
-    cond_closure  = check_self_referential_closure(text, metrics)
-
+    cond_density   = check_density_sourcing(metrics)
+    cond_closure   = check_self_referential_closure(text, metrics)
     conditions = {
-        "Anchor Presence":              cond_anchor,
-        "Structural Transfer":          cond_transfer,
-        "Fractal Recursion":            cond_recursion,
+        "Anchor Presence":               cond_anchor,
+        "Structural Transfer":           cond_transfer,
+        "Fractal Recursion":             cond_recursion,
         "Density-to-Sourcing Imbalance": cond_density,
-        "Self-Referential Closure":     cond_closure,
+        "Self-Referential Closure":      cond_closure,
     }
-
     mandatory_met = cond_anchor[0] and cond_transfer[0] and cond_recursion[0]
-
     return {
-        "chain":        chain,
-        "key_nodes":    key_nodes,
-        "transitions":  transitions,
-        "escalation":   escalation,
-        "dropoff":      dropoff,
-        "topology":     topology,
+        "chain":         chain,
+        "key_nodes":     key_nodes,
+        "transitions":   transitions,
+        "escalation":    escalation,
+        "dropoff":       dropoff,
+        "topology":      topology,
         "topology_note": TOPOLOGY_GUIDANCE[topology],
-        "anchor_type":  anchor_type,
-        "guidance":     guidance,
-        "metrics":      metrics,
-        "conditions":   conditions,
+        "anchor_type":   anchor_type,
+        "guidance":      guidance,
+        "metrics":       metrics,
+        "conditions":    conditions,
         "fct_confirmed": mandatory_met,
-        "scale_units":  scale_units,
+        "scale_units":   scale_units,
     }
